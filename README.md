@@ -10,7 +10,7 @@ python -m banalyse.web        # 或： banalyse serve
 
 ![Banalyse 界面预览](./output.jpg)
 
-> 面向「国内外双市场、数据供应商可插拔」。M0 为骨架，可离线运行（默认 mock LLM）。
+> 面向「国内外双市场、数据供应商可插拔」。
 
 ## 目录分层（依赖单向向下）
 
@@ -30,49 +30,9 @@ python main.py              # 用 mock LLM 离线跑通可编译空图
 pytest -q                   # 运行测试
 ```
 
-## 配置（两种方式，任选）
 
-### 方式一：网页端配置（推荐，无需手改环境变量）
 
-```bash
-cd  Banalyse                  # 在项目目录
-python -m banalyse.web        # 或： banalyse serve
-# 打开 http://127.0.0.1:8000
-```
-
-在页面上：**选 Provider → 填 API Key → 点「测试连通性」→ 保存 → 生成报告**。
-
-- 可选 Provider：`mock`(离线) / `deepseek` / `qwen` / `zhipu` / `openai` / `ollama`
-- Key 存放于 `~/.banalyse/web_config.json`（`chmod 600`，不进仓库）
-- **Key 永不回传前端**：页面只显示掩码（如 `sk-l••••••9999`）；输入框留空提交＝保持不变
-- 「测试连通性」用的 Key 不会落盘（支持先测再存）
-- 监听地址/端口/口令：`BA_WEB_HOST`（默认 `127.0.0.1`）、`BA_WEB_PORT`（默认 `8000`）、
-  `BA_WEB_TOKEN`（可选口令，设置后请求需带 `X-Web-Token` 头）
-- 配置落盘位置可用 `BA_WEB_CONFIG` 覆盖；环境变量中的 Key 仍作为兜底
-
-### 方式二：环境变量 / CLI（适合脚本与 CI）
-
-```bash
-export BA_LLM_PROVIDER=deepseek
-export DEEPSEEK_API_KEY=sk-...
-python main.py                      # 或 banalyse generate 600519.SS -c 贵州茅台
-```
-
-优先级：**网页端传入的 Key > 环境变量**（`OpenAIClient.resolve_api_key()`）。
-
-```powershell
-Copy-Item .env.example .env    # 之后所有 BA_* 都可在 .env 里配置
-```
-> `.env` 位于**项目根目录**，程序启动时自动加载（已导出的真实环境变量优先级更高，不会被覆盖）。
-
-## 数据目录（默认在项目内，不占 C 盘用户目录）
-
-| 内容 | 默认位置 |
-|---|---|
-| 报告 JSON | `<项目目录>\.local\logs\<ticker>\report_<date>.json` |
-| 网页端配置（含 API Key） | `<项目目录>\.local\web_config.json` |
-
-默认落在项目目录下的 `.local\`，**自动跟随仓库所在盘**（本项目在 D 盘）。要改到别处：
+默认落在项目目录下的 `.local\`，**自动跟随仓库所在盘**。要改到别处：
 
 ```powershell
 # 方式1：改整个数据目录
@@ -85,18 +45,6 @@ $env:BA_WEB_CONFIG = 'D:\data\banalyse\web_config.json'
 > 上述变量写进 `.env` 即可长期生效，无需每次设 PowerShell 变量。
 
 ## 数据来源（两家，按市场分工）
-
-市场**不需要你选**，由股票代码形态推断（`dataflows/market.py`）：
-
-| 代码写法 | 推断市场 | 供应商链 |
-|---|---|---|
-| `600519` / `600519.SS` / `000001` | `china` | AKShare |
-| `AAPL` / `MSFT` / `BRK.A` | `global` | SEC EDGAR |
-
-规则只有一条：**纯数字 → A 股，含字母 → 美股**。`.SS` / `.SZ` / `.SH` / `.BJ`
-是 A 股的等价后缀写法，先剥掉再判形态（否则 `600519.SS` 会被误判成美股）。
-
-链配置（`BA_DATA_VENDORS_GLOBAL` / `BA_DATA_VENDORS_CHINA` 可覆盖）：
 
 ```python
 "data_vendors": {"global": ["sec_edgar"], "china": ["akshare"]}
@@ -211,18 +159,6 @@ python scripts/check_vendors.py AAPL      # 海外链（SEC EDGAR）
 逐槽位打印真实返回；拿不到数据的槽位会显示哨兵与失败原因
 （没配 UA / 没装 akshare / 没实现 / 真的没数据）。脚本会先打印推断出的市场。
 
-## 网页端 API 一览
-
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | `/api/providers` | Provider 清单（驱动 UI 联动） |
-| GET / PUT | `/api/config` | 读取（掩码）/ 保存配置 |
-| DELETE | `/api/config/key` | 清除已存 Key |
-| POST | `/api/config/reset` | 重置全部网页配置 |
-| POST | `/api/config/test` | 连通性测试（可临时传参，不落盘） |
-| POST | `/api/reports` | 生成报告 |
-| GET | `/api/reports/{ticker}/{date}` | 读取已落盘报告 |
-| GET | `/api/health` | 健康检查 |
 
 ## 里程碑
 
