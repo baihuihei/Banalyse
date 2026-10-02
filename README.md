@@ -8,7 +8,7 @@ cd  Banalyse                  # 在项目目录
 python -m banalyse.web        # 或： banalyse serve
 # 打开 http://127.0.0.1:8000
 
-![Banalyse 界面预览](./output.jpg)
+#![Banalyse 界面预览](./output.jpg)
 
 > 面向「国内外双市场、数据供应商可插拔」。
 
