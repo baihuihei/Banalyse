@@ -1,0 +1,20 @@
+langgraph>=1.0
+langchain-core>=1.0
+langchain-openai>=1.0
+pydantic>=2.0
+python-dotenv>=1.0
+pandas>=2.0
+typer>=0.9
+rich>=13.0
+# 网页端（浏览器里配 provider / API Key）
+fastapi>=0.115
+uvicorn>=0.30
+# 数据源：单源 SEC EDGAR（免费公开接口，只需 requests + 一个 UA 头）
+requests>=2.31
+# 数据源：A 股走 AKShare（免 key；抓取东财/新浪/同花顺，纯数字代码的市场）
+akshare>=1.12
+
+# 后续里程碑（图表 / PDF）
+# matplotlib>=3.7
+# jinja2>=3.1
+# weasyprint>=60

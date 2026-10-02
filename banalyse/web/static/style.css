@@ -1,0 +1,517 @@
+:root {
+  --bg: #0f1420;
+  --panel: #171d2b;
+  --panel-2: #1e2536;
+  --line: #2a3346;
+  --text: #e6ebf5;
+  --muted: #8b98b0;
+  --accent: #4f8cff;
+  --accent-2: #2d6ae0;
+  --ok: #3fbf7f;
+  --err: #ef5f6b;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+/* hidden 属性必须真的隐藏。
+   .panes 之类的类设了 display，作者样式会盖掉 UA 的 [hidden]{display:none}，
+   于是"隐藏"的元素照样参与布局。 */
+[hidden] { display: none !important; }
+
+/* ---------- 滚动条：默认隐藏，悬停所在区域才浮现 ----------
+   为什么不干脆 width:0 全藏掉：那样「下面还有内容」就完全看不出来，
+   长报告 + 横向分栏尤其容易让人以为页面坏了。
+   这里改成滑块透明、尺寸固定，所以显示/隐藏不会引起重排（不会抖）。 */
+* {
+  scrollbar-width: thin;                     /* Firefox */
+  scrollbar-color: transparent transparent;
+}
+*:hover { scrollbar-color: var(--line) transparent; }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  background-clip: content-box;
+  border: 3px solid transparent;             /* 内缩成细条 */
+  border-radius: 99px;
+}
+:hover::-webkit-scrollbar-thumb { background-color: var(--line); }
+::-webkit-scrollbar-thumb:hover { background-color: var(--muted); }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+.mono { font-family: ui-monospace, Consolas, "Courier New", monospace; font-size: 12px; }
+
+/* ---------- 中栏顶端常驻标题 ---------- */
+.stage-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 11px 18px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.stage-head h1 { margin: 0; font-size: 17px; letter-spacing: .3px; }
+.stage-head p { margin: 0; color: var(--muted); font-size: 12.5px; }
+
+/* ---------- 三栏布局：左=配置 / 中=结果 / 右=豆包 ---------- */
+/* 列宽用 clamp(最小, vw, 最大) 夹住：
+   窗口宽时用固定上限（好看），窗口变窄时三栏一起等比缩，不会互相挤爆。
+   注意不要给任何一栏写死 min-width——那是最容易导致横向溢出的地方。 */
+.app {
+  --sidebar-w: clamp(170px, 19vw, 320px);
+  --doubao-w: clamp(210px, 30vw, 460px);
+  --splitter-w: 6px;
+  display: flex;
+  height: 100vh;
+  height: 100dvh;              /* 移动端地址栏收起时不跳动；不支持的浏览器用上面的 100vh */
+  overflow: hidden;
+}
+
+.sidebar {
+  flex: 0 0 var(--sidebar-w);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 14px 24px;
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+}
+/* 关键：纵向 flex 里 flex-shrink 默认是 1，面板会被压扁；
+   配合 .panel 的 overflow:hidden，底部按钮会被裁掉而且不出滚动条。
+   设成 0 让面板保持自然高度，超出交给 .sidebar 的 overflow-y 滚动。 */
+.sidebar > * { flex: 0 0 auto; }
+
+.stage {
+  flex: 1 1 0;
+  min-width: 0;                /* flex 子项默认 min-width:auto，会被内容顶开 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.doubao-col {
+  flex: 0 0 var(--doubao-w);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+}
+
+.splitter {
+  flex: 0 0 var(--splitter-w);
+  cursor: col-resize;
+  background: var(--line);
+  transition: background .15s;
+  touch-action: none;          /* 触摸拖动时别让浏览器抢去做滚动 */
+  -webkit-user-select: none;
+  user-select: none;
+}
+.splitter:hover, .splitter.active { background: var(--accent); }
+body.dragging { cursor: col-resize; user-select: none; }
+/* iframe 会吞掉 mousemove，拖动时把它屏蔽掉，否则鼠标一进豆包就"掉线" */
+body.dragging #doubao-frame { pointer-events: none; }
+
+/* ---------- 面板 ---------- */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.panel > h2,
+.panel > summary {
+  margin: 0;
+  padding: 11px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+.panel > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.panel > summary::-webkit-details-marker { display: none; }
+.panel > summary::before { content: '▸'; color: var(--muted); font-size: 11px; }
+.panel[open] > summary::before { content: '▾'; }
+.panel > summary small { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+.panel-body { padding: 14px; }
+.panel-body > .field:last-child { margin-bottom: 0; }
+
+/* 旧标记兼容（其它页面/历史快照仍可能用 .card） */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+}
+
+/* ---------- 表单 ---------- */
+.field { margin-bottom: 14px; }
+.field label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12.5px; }
+.field label small, .req { color: var(--accent); }
+.req { color: var(--err); }
+
+input, select {
+  width: 100%;
+  padding: 9px 11px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+input:focus, select:focus { border-color: var(--accent); }
+
+.row { display: flex; gap: 8px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+.hint { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.hint.warn { color: #e8b451; }
+.hint.err { color: var(--err); }
+
+/* ---------- 按钮 ---------- */
+.actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+
+.btn {
+  padding: 9px 15px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: .15s;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn-primary:hover { background: var(--accent-2); }
+.btn-ghost { background: transparent; }
+.btn-danger { background: transparent; border-color: #6b2b32; color: var(--err); }
+.btn-danger:hover { border-color: var(--err); }
+
+/* ---------- 徽标 ---------- */
+.badge {
+  padding: 3px 9px; border-radius: 99px;
+  font-size: 11.5px; background: #23304a; color: var(--accent);
+}
+.badge-muted { background: #26303f; color: var(--muted); }
+
+/* ---------- 中栏：内容 ---------- */
+.stage-body { flex: 1 1 auto; overflow: auto; padding: 16px 18px; }
+
+/* 整排超宽时：横向滚动条保持可见（否则“右边还有内容”完全看不出来），
+   并且光标提示可以按住拖动平移。纵向滚动条仍然悬停才浮现。 */
+.stage-body.pan-x { cursor: grab; }
+.stage-body.pan-x.panning { cursor: grabbing; }
+.stage-body.pan-x::-webkit-scrollbar-thumb { background-color: var(--line); }
+.stage-body.pan-x::-webkit-scrollbar-thumb:hover { background-color: var(--muted); }
+.stage-foot {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 14px;
+  min-height: 28px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+#result-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#viewport-info { flex: 0 0 auto; opacity: .75; }
+
+.placeholder { color: var(--muted); max-width: 640px; }
+.placeholder h3 { color: var(--text); font-size: 15px; margin: 20px 0 6px; }
+.placeholder p { margin: 6px 0; font-size: 13px; }
+
+/* ---------- 初始页：四个框（横排一行） ---------- */
+/* 容器要够宽才排得下四列：四张卡各约 210px + 三个 12px 间距 ≈ 880px，
+   留出余量取 1160px。写死 4 列而不是 auto-fit，是"排成一排"这个要求的直接落地；
+   中栏被拖窄时靠下面的 @media 退回 2 列 / 1 列，不会把卡片挤成一条。 */
+.dims-intro { max-width: 1160px; }
+.dims-intro-head { display: flex; align-items: center; gap: 10px; margin: 2px 0 8px; }
+.dims-intro-head h3 { margin: 0; font-size: 15px; color: var(--text); }
+.dims-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.dim-card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+  min-width: 0;            /* 栅格里允许收缩，长要点不会顶破卡片 */
+}
+.dim-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.dim-card-head .no {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  background: #23304a; color: var(--accent);
+  border-radius: 6px; font-size: 11px;
+}
+.dim-card-head h4 { margin: 0; font-size: 13.5px; color: var(--text); }
+.dim-card .brief { margin: 0 0 8px; font-size: 12.5px; }
+.dim-card .points { margin: 0; padding-left: 16px; color: var(--muted); font-size: 12px; }
+.dim-card .points li { margin: 3px 0; }
+
+/* 中栏被拖窄（或窗口变小）时逐级降列，保证四张卡始终完整可读 */
+@media (max-width: 1180px) {
+  .dims-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .dims-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- 初始页：整块容器（有结果时隐藏，让位给报告） ---------- */
+/* 同样放宽到能容下四列，否则 .dims-intro 的 1160px 会被这里截成 880px */
+.stage-intro { max-width: 1160px; }
+.stage-intro > * + * { margin-top: 22px; }
+
+/* ---------- 已保存的分析 ---------- */
+.history { padding-top: 18px; border-top: 1px solid var(--line); }
+.history-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.history-head h3 { margin: 0; font-size: 15px; color: var(--text); }
+#history-dir { margin: 4px 0 0; word-break: break-all; }
+.history-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.history-item { display: flex; align-items: stretch; gap: 8px; }
+.history-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  /* 代码 / 名称 / 基准日 / 保存时间：名称列吃掉剩余宽度并可省略，
+     两个时间列按内容宽度固定，最长的一行决定整行高度。 */
+  grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: .15s;
+}
+.history-open:hover { background: var(--panel); border-color: var(--accent); }
+.history-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.history-open .code { font-weight: 600; color: var(--accent); }
+.history-open .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-open .date, .history-open .time { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.history-del {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: .15s;
+}
+.history-del:hover { color: #e5534b; border-color: #e5534b; }
+
+/* 分栏内容：多个模块横着并排。宽度由 JS 按「份额」写成 flex-basis：
+   flex-shrink:0 是关键——栏不会为了塞进容器而压缩，超出就交给横向滚动。 */
+.panes {
+  display: flex;
+  gap: 0;                 /* 栏间距由 .pane-gutter 提供，拖动条就在那道缝里 */
+  align-items: stretch;   /* 各栏等高：卡片整齐，拖动条也能贯穿整高更好点 */
+}
+.pane {
+  flex: 1 0 auto;         /* 值会被 JS 覆写成 flex: 1 0 <px> */
+  min-width: 0;
+  min-height: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+/* 两栏之间的拖动条：平时只占位不可见，悬停/拖动时才亮出一条竖线 */
+.pane-gutter {
+  flex: 0 0 12px;
+  align-self: stretch;
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.pane-gutter::before {
+  content: '';
+  position: absolute;
+  inset: 0 5px;           /* 12px 里居中一条 2px 竖线 */
+  border-radius: 99px;
+  background: transparent;
+  transition: background .15s;
+}
+.pane-gutter:hover::before,
+.pane-gutter.active::before { background: var(--accent); }
+.pane h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+}
+.pane pre {
+  margin: 0;
+  white-space: pre-wrap; word-break: break-word;
+  font-size: 12.5px;
+}
+details summary { cursor: pointer; color: var(--muted); font-size: 12.5px; margin-bottom: 6px; }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed; right: 22px; bottom: 22px;
+  max-width: 460px;
+  padding: 12px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.toast.err { border-left-color: var(--err); }
+
+/* ---------- 左栏：维度按钮组 ---------- */
+.dim-buttons { display: grid; gap: 8px; margin: 4px 0 0; }
+.dim-btn {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font: inherit; font-size: 13px;
+  text-align: left; cursor: pointer;
+  transition: .15s;
+}
+.dim-btn:hover { border-color: var(--accent); }
+.dim-btn.on { border-left-color: var(--accent); color: var(--text); }
+.dim-btn .mark { font-size: 11px; color: var(--muted); width: 12px; }
+.dim-btn.on .mark { color: var(--accent); }
+.dim-btn .label { flex: 1; }
+.dim-btn .state { font-size: 11.5px; color: var(--muted); }
+
+.btn-block { width: 100%; justify-content: center; }
+.btn-sm { padding: 5px 10px; font-size: 12.5px; }
+
+/* 主操作跟在面板后面回到普通文档流：不吸底、不悬浮，不会遮住配置框 */
+.sidebar-action { padding-top: 2px; }
+
+/* ---------- 右栏：豆包（常驻，不收起） ---------- */
+.doubao-head {
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.doubao-head h2 { margin: 0; font-size: 13.5px; font-weight: 600; }
+.doubao-frame-wrap {
+  flex: 1 1 auto;
+  min-height: 0;        /* 关键：flex 子项默认 min-height:auto，不给 0 会让 iframe 撑破右栏 */
+  background: #fff;
+}
+#doubao-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* ---------- 自适应：窗口略窄时收窄两翼，仍保持三栏 ---------- */
+@media (max-width: 1180px) {
+  .app {
+    --sidebar-w: clamp(160px, 20vw, 260px);
+    --doubao-w: clamp(200px, 29vw, 340px);
+  }
+}
+
+/* ---------- 自适应：手机等极窄屏，三栏并排已不可能，改为纵向堆叠 ----------
+   横向溢出的页面会左右滑动、内容被切掉，比堆叠难用得多，所以宁可换布局。
+   注意：Windows 显示缩放（125%/150%）或浏览器缩水会把 CSS 视口压得很小，
+   比如 1920 屏 @150% 只有 1280，所以这个断点不能设得太高。 */
+@media (max-width: 600px) {
+  .app {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;         /* 交给整页滚动 */
+  }
+  .sidebar,
+  .splitter,
+  .stage,
+  .doubao-col { flex: 0 0 auto; width: 100%; min-width: 0; }
+
+  .sidebar {
+    gap: 10px;
+    padding: 14px 14px 18px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    overflow: visible;
+  }
+  .sidebar-action { padding-top: 2px; }
+
+  .stage { min-height: 60vh; overflow: visible; }
+  .stage-body { overflow: visible; }
+  /* 窄屏放不下并排，改成一栏一行 */
+  .panes { flex-direction: column; }
+  /* 纵向排列时 flex-basis 会作用在高度上，得改回按内容高度 */
+  .pane { flex: 0 0 auto !important; min-width: 0; width: 100%; }
+  .pane-gutter { display: none; }   /* 堆叠后没有左右可分 */
+
+  .doubao-col { border-left: 0; border-top: 1px solid var(--line); }
+  .doubao-frame-wrap { height: 70vh; }
+
+  .splitter { display: none; }   /* 堆叠后没有可拖的分界 */
+
+  .toast { left: 14px; right: 14px; bottom: 14px; max-width: none; }
+}
+
+/* 横屏手机：高度很矮，别让中栏吃掉全部高度 */
+@media (max-width: 600px) and (max-height: 520px) {
+  .stage { min-height: 80vh; }
+  .doubao-frame-wrap { height: 85vh; }
+}
+
+/* ---------- 自适应：三栏但很窄时，收紧小控件避免溢出 ---------- */
+@media (max-width: 1180px) {
+  .dim-btn { padding: 9px 10px; }
+}
+
+@media (max-width: 900px) {
+  /* 更窄时行内放不下“显示/隐藏”，先让位给维度名（✓/○ 和左侧色条仍能看出状态） */
+  .dim-btn .state { display: none; }
+}
