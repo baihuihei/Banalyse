@@ -1,7 +1,6 @@
 # Banalyse
 
-以 [FinRobot](../FinRobot-master) 的业务蓝本（多章节股权研究/企业分析报告），
-用 **LangGraph / LangChain** 重写编排层的多智能体企业分析工具。
+用 **LangGraph / LangChain** 编排多智能体企业分析工具。
 
 使用：
 cd  Banalyse                  # 在项目目录
