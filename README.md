@@ -1,4 +1,9 @@
-# Banalyse
+# Banalyse 执行文件
+
+下载并解Banalyse\Banalyse.zip
+点击exe执行文件即可使用
+
+# Banalyse 代码文件
 
 用 **LangGraph / LangChain** 编排多智能体企业分析工具。
 
