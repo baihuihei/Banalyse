@@ -1,6 +1,6 @@
 # Banalyse 执行文件
 
-下载并解Banalyse\Banalyse.zip
+下载并解压Banalyse\Banalyse.zip
 点击exe执行文件即可使用
 
 # Banalyse 代码文件
